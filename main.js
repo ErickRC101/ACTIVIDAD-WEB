@@ -13,14 +13,28 @@ import { getToken } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-mes
 document.addEventListener('DOMContentLoaded', () => {
 
     // --- Lógica de Registro del Service Worker (Etapa 3) ---
+    // ¡¡ESTE ES EL BLOQUE CORREGIDO!!
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-            navigator.serviceWorker.register('sw.js')
+            
+            // 1. Registra tu SW principal (para caché offline)
+            navigator.serviceWorker.register('sw.js') 
                 .then(registration => {
-                    console.log('SW registrado:', registration);
+                    console.log('SW (principal) registrado:', registration);
                 })
                 .catch(error => {
-                    console.log('Error al registrar SW:', error);
+                    console.log('Error al registrar SW (principal):', error);
+                });
+
+            // 2. ¡NUEVO! Registra el SW de Firebase Messaging
+            // Esto le dice a Firebase dónde está el archivo
+            // y soluciona el error 404 de la raíz.
+            navigator.serviceWorker.register('firebase-messaging-sw.js') 
+                .then(registration => {
+                    console.log('SW (Firebase) registrado:', registration);
+                })
+                .catch(error => {
+                    console.log('Error al registrar SW (Firebase):', error);
                 });
         });
     }
@@ -157,11 +171,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     function pedirToken() {
-        //
-        // ¡¡ATENCIÓN!! PEGA TU CLAVE VAPID AQUÍ
-        // (La que generaste en la consola de Firebase -> Cloud Messaging)
-        //
-        const VAPID_KEY = "BFP4SNKgtthyCcA57vQGpMkBFcLgLWzntgivWXNOgHPFhKJ1osAj_26jUXGf4Tad1UhviqBrQqPxqW1tpB7o7wI	";
+        // ¡¡CLAVE VAPID ARREGLADA (sin espacio al final)!!
+        const VAPID_KEY = "BFP4SNKgtthyCcA57vQGpMkBFcLgLWzntgivWXNOgHPFhKJ1osAj_26jUXGf4Tad1UhviqBrQqPxqW1tpB7o7wI";
 
         getToken(messaging, { vapidKey: VAPID_KEY })
             .then((currentToken) => {
