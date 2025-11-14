@@ -7,48 +7,36 @@ import {
     query, orderBy, Timestamp 
 } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
 
-// ¡NUEVA IMPORTACIÓN!
+// Importar el 'getToken' para las notificaciones
 import { getToken } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-messaging.js";
 
 document.addEventListener('DOMContentLoaded', () => {
 
     // --- Lógica de Registro del Service Worker (Etapa 3) ---
-    // ¡¡ESTE ES EL BLOQUE CORREGIDO!!
+    // Solo registramos el SW principal aquí.
+    // El de Firebase se registrará al hacer clic en el botón.
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-            
-            // 1. Registra tu SW principal (para caché offline)
-            navigator.serviceWorker.register('sw.js') 
+            navigator.serviceWorker.register('sw.js')
                 .then(registration => {
                     console.log('SW (principal) registrado:', registration);
                 })
                 .catch(error => {
                     console.log('Error al registrar SW (principal):', error);
                 });
-
-            // 2. ¡NUEVO! Registra el SW de Firebase Messaging
-            // Esto le dice a Firebase dónde está el archivo
-            // y soluciona el error 404 de la raíz.
-            navigator.serviceWorker.register('firebase-messaging-sw.js') 
-                .then(registration => {
-                    console.log('SW (Firebase) registrado:', registration);
-                })
-                .catch(error => {
-                    console.log('Error al registrar SW (Firebase):', error);
-                });
         });
     }
 
-    // --- Ejercicio 1: Lógica de Almacenamiento (Etapa 4) ---
-
-    // Referencias del DOM
+    // --- Lógica de Almacenamiento (Etapa 4) ---
     const formTarea = document.getElementById('form-tarea');
     const inputTarea = document.getElementById('input-tarea');
     const listaTareas = document.getElementById('lista-tareas');
-
-    // Referencia a la colección de Firestore
     const tareasCollection = collection(db, 'tareas');
 
+    // (Aquí van tus funciones: renderizarTarea, agregarTarea, borrarTarea)
+    // (Aquí van tus funciones: guardarLocal, borrarLocal, obtenerTareasLocal)
+    // (Aquí va tu función: cargarTareas)
+    
     // Función para renderizar una tarea en la UI
     function renderizarTarea(id, texto) {
         const li = document.createElement('li');
@@ -57,26 +45,21 @@ document.addEventListener('DOMContentLoaded', () => {
             <span>${texto}</span>
             <button class="delete-btn">Borrar</button>
         `;
-        
-        // Asignar evento al botón de borrar
         li.querySelector('.delete-btn').onclick = () => {
             borrarTarea(id, li);
         };
-
         listaTareas.appendChild(li);
     }
 
     // Función para agregar tarea
     async function agregarTarea(e) {
-        e.preventDefault(); // Evita que el formulario recargue la página
+        e.preventDefault(); 
         const textoTarea = inputTarea.value.trim();
         if (textoTarea === '') return;
-
         const nuevaTarea = {
             texto: textoTarea,
             timestamp: Timestamp.fromDate(new Date())
         };
-
         try {
             const docRef = await addDoc(tareasCollection, nuevaTarea);
             guardarLocal(docRef.id, nuevaTarea.texto);
@@ -84,7 +67,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             console.error("Error al guardar en Firestore: ", error);
         }
-        inputTarea.value = ''; // Limpiar el input
+        inputTarea.value = ''; 
     }
 
     // Función para borrar tarea
@@ -104,13 +87,11 @@ document.addEventListener('DOMContentLoaded', () => {
         tareas[id] = texto;
         localStorage.setItem('tareas', JSON.stringify(tareas));
     }
-
     function borrarLocal(id) {
         const tareas = obtenerTareasLocal();
         delete tareas[id];
         localStorage.setItem('tareas', JSON.stringify(tareas));
     }
-
     function obtenerTareasLocal() {
         const tareas = localStorage.getItem('tareas');
         return tareas ? JSON.parse(tareas) : {};
@@ -121,16 +102,13 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const q = query(tareasCollection, orderBy("timestamp", "desc"));
             const querySnapshot = await getDocs(q);
-
             if (querySnapshot.empty) {
-                console.log("No hay tareas en Firestore, cargando de localStorage...");
                 const tareasLocales = obtenerTareasLocal();
                 for (const id in tareasLocales) {
                     renderizarTarea(id, tareasLocales[id]);
                 }
             } else {
-                console.log("Cargando tareas desde Firestore...");
-                localStorage.removeItem('tareas'); // Limpiamos local
+                localStorage.removeItem('tareas'); 
                 querySnapshot.forEach(doc => {
                     const tarea = doc.data();
                     renderizarTarea(doc.id, tarea.texto);
@@ -146,13 +124,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Asignar el evento al ENVIAR el formulario
+    // Asignar eventos
     formTarea.addEventListener('submit', agregarTarea);
-    
-    // Cargar tareas al iniciar la app
     cargarTareas();
 
-    // --- Extensión Ejercicio 1: Detectar estado de red ---
+    // --- Estado de red ---
     const divEstadoRed = document.getElementById('estado-red');
     function actualizarEstadoRed() {
         divEstadoRed.className = navigator.onLine ? 'online' : 'offline';
@@ -167,30 +143,44 @@ document.addEventListener('DOMContentLoaded', () => {
 
     btnNotificaciones.addEventListener('click', () => {
         console.log("Solicitando permiso para Notificaciones Push...");
+        // ¡Se llama a la NUEVA función async!
         pedirToken();
     });
 
-    function pedirToken() {
-        // ¡¡CLAVE VAPID ARREGLADA (sin espacio al final)!!
+    // ¡¡FUNCIÓN 'pedirToken' ACTUALIZADA!!
+    // La convertimos en 'async' para poder usar 'await'
+    async function pedirToken() {
+        
         const VAPID_KEY = "BFP4SNKgtthyCcA57vQGpMkBFcLgLWzntgivWXNOgHPFhKJ1osAj_26jUXGf4Tad1UhviqBrQqPxqW1tpB7o7wI";
 
-        getToken(messaging, { vapidKey: VAPID_KEY })
-            .then((currentToken) => {
-                if (currentToken) {
-                    // ¡Token obtenido!
-                    console.log('Token de dispositivo (FCM):', currentToken);
-                    
-                    btnNotificaciones.textContent = "¡Notificaciones Activadas!";
-                    btnNotificaciones.disabled = true;
+        try {
+            // ¡¡ESTE ES EL ARREGLO!!
+            // 1. Registramos manualmente el SW de Firebase
+            //    en la ruta correcta (el directorio actual).
+            const swRegistration = await navigator.serviceWorker.register('firebase-messaging-sw.js');
+            console.log('SW (Firebase) registrado manualmente:', swRegistration);
 
-                } else {
-                    // El usuario no dio permiso
-                    console.log('No se obtuvo permiso para notificaciones.');
-                }
-            })
-            .catch((err) => {
-                console.log('Ocurrió un error al obtener el token.', err);
+            // 2. Pasamos ESE registro a getToken.
+            //    Esto evita que getToken busque en la raíz (error 404).
+            const currentToken = await getToken(messaging, { 
+                vapidKey: VAPID_KEY,
+                serviceWorkerRegistration: swRegistration // <-- ¡Esta es la magia!
             });
+
+            if (currentToken) {
+                // ¡Token obtenido!
+                console.log('Token de dispositivo (FCM):', currentToken);
+                
+                btnNotificaciones.textContent = "¡Notificaciones Activadas!";
+                btnNotificaciones.disabled = true;
+
+            } else {
+                // El usuario no dio permiso
+                console.log('No se obtuvo permiso para notificaciones.');
+            }
+        } catch (err) {
+            console.log('Ocurrió un error al obtener el token.', err);
+        }
     }
 
 });
