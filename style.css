@@ -1,0 +1,98 @@
+/* Estilos generales */
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    background-color: #f4f4f4;
+}
+
+/* Etapa 1: Splash Screen */
+#splash-screen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: #3498db;
+    color: white;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    transition: opacity 0.5s ease-out;
+}
+#splash-screen img {
+    width: 100px;
+    height: 100px;
+}
+
+/* Etapa 1: Home Screen */
+#home-screen {
+    padding: 20px;
+}
+.hidden {
+    display: none;
+}
+
+header {
+    text-align: center;
+    color: #333;
+}
+
+/* Formulario */
+#form-tarea {
+    display: flex;
+    margin-bottom: 20px;
+}
+#input-tarea {
+    flex-grow: 1;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+#form-tarea button {
+    padding: 10px 15px;
+    background-color: #3498db;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    margin-left: 10px;
+    cursor: pointer;
+}
+
+/* Lista de tareas */
+#lista-tareas {
+    list-style-type: none;
+    padding: 0;
+}
+#lista-tareas li {
+    background: white;
+    padding: 15px;
+    margin-bottom: 10px;
+    border-radius: 4px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.delete-btn {
+    background: #e74c3c;
+    color: white;
+    border: none;
+    padding: 5px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+/* Estado de red */
+#estado-red {
+    text-align: center;
+    padding: 10px;
+    font-weight: bold;
+}
+.online {
+    color: green;
+}
+.offline {
+    color: red;
+}
