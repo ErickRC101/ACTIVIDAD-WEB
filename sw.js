@@ -14,8 +14,6 @@ const urlsToCache = [
     'images/icon-192x192.png',
     'images/icon-512x512.png',
     'images/logo.png',
-    // ¡IMPORTANTE! Agrega el nuevo service worker de firebase a la caché
-    // para que esté disponible sin conexión si es posible.
     'firebase-messaging-sw.js' 
 ];
 
