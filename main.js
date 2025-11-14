@@ -1,10 +1,14 @@
-// Importar la 'db' de tu archivo de configuración
-import { db } from './firebase-config.js'; 
+// Importar 'db' y 'messaging' de tu archivo de configuración
+import { db, messaging } from './firebase-config.js'; 
+
 // Importar las funciones de Firestore que usaremos
 import { 
     collection, addDoc, getDocs, deleteDoc, doc, 
     query, orderBy, Timestamp 
 } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
+
+// ¡NUEVA IMPORTACIÓN!
+import { getToken } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-messaging.js";
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -51,9 +55,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // Función para agregar tarea
     async function agregarTarea(e) {
         e.preventDefault(); // Evita que el formulario recargue la página
-        
-        console.log("Intentando agregar tarea..."); // Para depuración
-
         const textoTarea = inputTarea.value.trim();
         if (textoTarea === '') return;
 
@@ -63,20 +64,12 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         try {
-            // Guardar en Firestore
             const docRef = await addDoc(tareasCollection, nuevaTarea);
-            console.log("Tarea guardada en Firestore:", docRef.id);
-            
-            // Guardar en localStorage
             guardarLocal(docRef.id, nuevaTarea.texto);
-            
-            // Renderizar en la UI
             renderizarTarea(docRef.id, nuevaTarea.texto);
-
         } catch (error) {
             console.error("Error al guardar en Firestore: ", error);
         }
-        
         inputTarea.value = ''; // Limpiar el input
     }
 
@@ -86,7 +79,6 @@ document.addEventListener('DOMContentLoaded', () => {
             await deleteDoc(doc(db, 'tareas', id));
             borrarLocal(id);
             listaTareas.removeChild(elementoLi);
-            console.log("Tarea eliminada:", id);
         } catch (error) {
             console.error("Error al eliminar de Firestore: ", error);
         }
@@ -113,29 +105,25 @@ document.addEventListener('DOMContentLoaded', () => {
     // Cargar tareas al iniciar
     async function cargarTareas() {
         try {
-            // Cargar desde Firestore, ordenadas por fecha
             const q = query(tareasCollection, orderBy("timestamp", "desc"));
             const querySnapshot = await getDocs(q);
 
             if (querySnapshot.empty) {
-                // Si Firestore está vacío, cargar de localStorage
                 console.log("No hay tareas en Firestore, cargando de localStorage...");
                 const tareasLocales = obtenerTareasLocal();
                 for (const id in tareasLocales) {
                     renderizarTarea(id, tareasLocales[id]);
                 }
             } else {
-                // Si hay datos en Firestore, son la fuente de verdad
                 console.log("Cargando tareas desde Firestore...");
                 localStorage.removeItem('tareas'); // Limpiamos local
                 querySnapshot.forEach(doc => {
                     const tarea = doc.data();
                     renderizarTarea(doc.id, tarea.texto);
-                    guardarLocal(doc.id, tarea.texto); // Sincronizamos local
+                    guardarLocal(doc.id, tarea.texto);
                 });
             }
         } catch (error) {
-            // Si falla Firestore (ej. offline), cargar de localStorage
             console.warn("Error de Firestore. Cargando de localStorage.", error.message);
             const tareasLocales = obtenerTareasLocal();
             for (const id in tareasLocales) {
@@ -160,23 +148,38 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('offline', actualizarEstadoRed);
     actualizarEstadoRed();
 
-    // --- Etapa 5 / Ejercicio 2: Notificaciones Push ---
+    // --- Etapa 5 / Ejercicio 2: Notificaciones Push (Modificado para FCM) ---
     const btnNotificaciones = document.getElementById('btn-notificaciones');
 
     btnNotificaciones.addEventListener('click', () => {
-        Notification.requestPermission().then(resultado => {
-            if (resultado === 'granted') {
-                mostrarNotificacionSimple();
-                btnNotificaciones.disabled = true;
-            }
-        });
+        console.log("Solicitando permiso para Notificaciones Push...");
+        pedirToken();
     });
 
-    function mostrarNotificacionSimple() {
-        const opciones = {
-            body: '¡Todo listo para recibir actualizaciones!',
-            icon: 'images/icon-192x192.png',
-        };
-        new Notification('Notificaciones Activadas', opciones);
+    function pedirToken() {
+        //
+        // ¡¡ATENCIÓN!! PEGA TU CLAVE VAPID AQUÍ
+        // (La que generaste en la consola de Firebase -> Cloud Messaging)
+        //
+        const VAPID_KEY = "PEGA_TU_CLAVE_VAPID_AQUÍ";
+
+        getToken(messaging, { vapidKey: VAPID_KEY })
+            .then((currentToken) => {
+                if (currentToken) {
+                    // ¡Token obtenido!
+                    console.log('Token de dispositivo (FCM):', currentToken);
+                    
+                    btnNotificaciones.textContent = "¡Notificaciones Activadas!";
+                    btnNotificaciones.disabled = true;
+
+                } else {
+                    // El usuario no dio permiso
+                    console.log('No se obtuvo permiso para notificaciones.');
+                }
+            })
+            .catch((err) => {
+                console.log('Ocurrió un error al obtener el token.', err);
+            });
     }
+
 });

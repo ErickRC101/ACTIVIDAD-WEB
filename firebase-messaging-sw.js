@@ -4,8 +4,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebas
 import { getFirestore } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
   // TODO: Add SDKs for Firebase products that you want to use
   // https://firebase.google.com/docs/web/setup#available-libraries
-// ¡NUEVA IMPORTACIÓN!
-import { getMessaging } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-messaging.js";
+
   // Your web app's Firebase configuration
   // For Firebase JS SDK v7.20.0 and later, measurementId is optional
   const firebaseConfig = {
@@ -20,7 +19,22 @@ import { getMessaging } from "https://www.gstatic.com/firebasejs/12.5.0/firebase
 
   // Initialize Firebase
   const app = initializeApp(firebaseConfig);
-  const analytics = getAnalytics(app);
-  export const db = getFirestore(app);
-  // ¡NUEVA LÍNEA! Exporta Messaging
-export const messaging = getMessaging(app);
+  // Obtener la instancia de Messaging
+const messaging = firebase.messaging();
+
+// Manejar notificaciones en segundo plano
+messaging.onBackgroundMessage((payload) => {
+  console.log(
+    "[firebase-messaging-sw.js] Mensaje en segundo plano recibido.",
+    payload
+  );
+
+  // Personalizar la notificación
+  const notificationTitle = payload.notification.title;
+  const notificationOptions = {
+    body: payload.notification.body,
+    icon: '/images/icon-192x192.png' // Usa uno de tus íconos
+  };
+
+  self.registration.showNotification(notificationTitle, notificationOptions);
+});

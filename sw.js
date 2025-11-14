@@ -1,8 +1,7 @@
 // sw.js
 
-// ¡¡ATENCIÓN!! Incrementa este número (v4, v5...) si haces cambios
-// en cualquier archivo cacheado para forzar la actualización.
-const CACHE_NAME = 'pwa-tareas-cache-v3';
+// ¡¡ATENCIÓN!! Incrementé la versión para forzar la actualización.
+const CACHE_NAME = 'pwa-tareas-cache-v4';
 
 // Lista de archivos a cachear
 const urlsToCache = [
@@ -11,24 +10,26 @@ const urlsToCache = [
     'style.css',
     'main.js',
     'manifest.json',
-    'firebase-config.js', // ¡Importante! Cachear este también
+    'firebase-config.js',
     'images/icon-192x192.png',
     'images/icon-512x512.png',
-    'images/logo.png'
-    // 'offline.html' // (Lo agregaremos en el Ejercicio 4)
+    'images/logo.png',
+    // ¡IMPORTANTE! Agrega el nuevo service worker de firebase a la caché
+    // para que esté disponible sin conexión si es posible.
+    'firebase-messaging-sw.js' 
 ];
 
 // 1. Evento de Instalación (install)
 self.addEventListener('install', event => {
-    console.log('SW: Instalando...');
+    console.log('SW (principal): Instalando...');
     event.waitUntil(
         caches.open(CACHE_NAME)
             .then(cache => {
-                console.log('SW: Abriendo caché y guardando archivos estáticos');
+                console.log('SW (principal): Abriendo caché y guardando archivos estáticos');
                 return cache.addAll(urlsToCache);
             })
             .catch(err => {
-                console.error('SW: Falló cache.addAll', err);
+                console.error('SW (principal): Falló cache.addAll', err);
             })
     );
 });
@@ -36,13 +37,13 @@ self.addEventListener('install', event => {
 // 2. Evento de Activación (activate)
 // Limpia cachés antiguas
 self.addEventListener('activate', event => {
-    console.log('SW: Activando...');
+    console.log('SW (principal): Activando...');
     event.waitUntil(
         caches.keys().then(cacheNames => {
             return Promise.all(
                 cacheNames.map(cacheName => {
                     if (cacheName !== CACHE_NAME) {
-                        console.log('SW: Limpiando caché antigua:', cacheName);
+                        console.log('SW (principal): Limpiando caché antigua:', cacheName);
                         return caches.delete(cacheName);
                     }
                 })
@@ -67,17 +68,8 @@ self.addEventListener('fetch', event => {
     );
 });
 
-// 4. Evento Push (para Notificaciones Push reales)
-self.addEventListener('push', event => {
-    console.log('SW: Notificación Push recibida');
-    const data = event.data ? event.data.json() : {};
-    const title = data.title || 'Nueva Tarea';
-    const options = {
-        body: data.body || '¡Tienes nuevas tareas pendientes!',
-        icon: 'images/icon-192x192.png',
-        badge: 'images/logo.png'
-    };
-    event.waitUntil(
-        self.registration.showNotification(title, options)
-    );
-});
+//
+// 4. Evento Push
+// (¡ELIMINADO!)
+// El archivo 'firebase-messaging-sw.js' se encarga ahora de esto.
+//
