@@ -8,18 +8,6 @@ import {
 
 document.addEventListener('DOMContentLoaded', () => {
 
-    // --- Lógica del Splash Screen (Etapa 1) ---
-    const splash = document.getElementById('splash-screen');
-    const home = document.getElementById('home-screen');
-
-    setTimeout(() => {
-        splash.style.opacity = '0';
-        home.classList.remove('hidden');
-        setTimeout(() => {
-            splash.classList.add('hidden');
-        }, 500);
-    }, 2000);
-
     // --- Lógica de Registro del Service Worker (Etapa 3) ---
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
@@ -52,6 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <button class="delete-btn">Borrar</button>
         `;
         
+        // Asignar evento al botón de borrar
         li.querySelector('.delete-btn').onclick = () => {
             borrarTarea(id, li);
         };
@@ -61,7 +50,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Función para agregar tarea
     async function agregarTarea(e) {
-        e.preventDefault();
+        e.preventDefault(); // Evita que el formulario recargue la página
+        
+        console.log("Intentando agregar tarea..."); // Para depuración
+
         const textoTarea = inputTarea.value.trim();
         if (textoTarea === '') return;
 
@@ -71,13 +63,21 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         try {
+            // Guardar en Firestore
             const docRef = await addDoc(tareasCollection, nuevaTarea);
+            console.log("Tarea guardada en Firestore:", docRef.id);
+            
+            // Guardar en localStorage
             guardarLocal(docRef.id, nuevaTarea.texto);
+            
+            // Renderizar en la UI
             renderizarTarea(docRef.id, nuevaTarea.texto);
+
         } catch (error) {
             console.error("Error al guardar en Firestore: ", error);
         }
-        inputTarea.value = '';
+        
+        inputTarea.value = ''; // Limpiar el input
     }
 
     // Función para borrar tarea
@@ -86,6 +86,7 @@ document.addEventListener('DOMContentLoaded', () => {
             await deleteDoc(doc(db, 'tareas', id));
             borrarLocal(id);
             listaTareas.removeChild(elementoLi);
+            console.log("Tarea eliminada:", id);
         } catch (error) {
             console.error("Error al eliminar de Firestore: ", error);
         }
@@ -112,23 +113,29 @@ document.addEventListener('DOMContentLoaded', () => {
     // Cargar tareas al iniciar
     async function cargarTareas() {
         try {
+            // Cargar desde Firestore, ordenadas por fecha
             const q = query(tareasCollection, orderBy("timestamp", "desc"));
             const querySnapshot = await getDocs(q);
 
             if (querySnapshot.empty) {
+                // Si Firestore está vacío, cargar de localStorage
+                console.log("No hay tareas en Firestore, cargando de localStorage...");
                 const tareasLocales = obtenerTareasLocal();
                 for (const id in tareasLocales) {
                     renderizarTarea(id, tareasLocales[id]);
                 }
             } else {
-                localStorage.removeItem('tareas');
+                // Si hay datos en Firestore, son la fuente de verdad
+                console.log("Cargando tareas desde Firestore...");
+                localStorage.removeItem('tareas'); // Limpiamos local
                 querySnapshot.forEach(doc => {
                     const tarea = doc.data();
                     renderizarTarea(doc.id, tarea.texto);
-                    guardarLocal(doc.id, tarea.texto);
+                    guardarLocal(doc.id, tarea.texto); // Sincronizamos local
                 });
             }
         } catch (error) {
+            // Si falla Firestore (ej. offline), cargar de localStorage
             console.warn("Error de Firestore. Cargando de localStorage.", error.message);
             const tareasLocales = obtenerTareasLocal();
             for (const id in tareasLocales) {
@@ -137,7 +144,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // Asignar el evento al ENVIAR el formulario
     formTarea.addEventListener('submit', agregarTarea);
+    
+    // Cargar tareas al iniciar la app
     cargarTareas();
 
     // --- Extensión Ejercicio 1: Detectar estado de red ---

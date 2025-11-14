@@ -5,33 +5,11 @@ body {
     background-color: #f4f4f4;
 }
 
-/* Etapa 1: Splash Screen */
-#splash-screen {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: #3498db;
-    color: white;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    z-index: 1000;
-    transition: opacity 0.5s ease-out;
-}
-#splash-screen img {
-    width: 100px;
-    height: 100px;
-}
-
 /* Etapa 1: Home Screen */
 #home-screen {
     padding: 20px;
-}
-.hidden {
-    display: none;
+    max-width: 600px;
+    margin: 0 auto;
 }
 
 header {
@@ -49,6 +27,7 @@ header {
     padding: 10px;
     border: 1px solid #ddd;
     border-radius: 4px;
+    font-size: 1em;
 }
 #form-tarea button {
     padding: 10px 15px;
@@ -58,6 +37,7 @@ header {
     border-radius: 4px;
     margin-left: 10px;
     cursor: pointer;
+    font-size: 1em;
 }
 
 /* Lista de tareas */

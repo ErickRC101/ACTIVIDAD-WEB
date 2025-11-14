@@ -1,14 +1,17 @@
 // sw.js
 
-// Definimos los recursos a cachear (Etapa 3 / Ejercicio 2)
-const CACHE_NAME = 'pwa-tareas-cache-v1';
+// ¡¡ATENCIÓN!! Incrementa este número (v4, v5...) si haces cambios
+// en cualquier archivo cacheado para forzar la actualización.
+const CACHE_NAME = 'pwa-tareas-cache-v3';
+
+// Lista de archivos a cachear
 const urlsToCache = [
     '/',
     'index.html',
     'style.css',
     'main.js',
     'manifest.json',
-    'firebase-config.js',
+    'firebase-config.js', // ¡Importante! Cachear este también
     'images/icon-192x192.png',
     'images/icon-512x512.png',
     'images/logo.png'
@@ -22,23 +25,35 @@ self.addEventListener('install', event => {
         caches.open(CACHE_NAME)
             .then(cache => {
                 console.log('SW: Abriendo caché y guardando archivos estáticos');
-                return cache.addAll(urlsToCache); // [cite: 64]
+                return cache.addAll(urlsToCache);
+            })
+            .catch(err => {
+                console.error('SW: Falló cache.addAll', err);
             })
     );
 });
 
 // 2. Evento de Activación (activate)
+// Limpia cachés antiguas
 self.addEventListener('activate', event => {
     console.log('SW: Activando...');
-    // Aquí podrías limpiar cachés antiguas si es necesario
+    event.waitUntil(
+        caches.keys().then(cacheNames => {
+            return Promise.all(
+                cacheNames.map(cacheName => {
+                    if (cacheName !== CACHE_NAME) {
+                        console.log('SW: Limpiando caché antigua:', cacheName);
+                        return caches.delete(cacheName);
+                    }
+                })
+            );
+        })
+    );
 });
 
 // 3. Evento de Interceptación (fetch)
 self.addEventListener('fetch', event => {
-    console.log('SW: Interceptando fetch para', event.request.url);
-    
     // Estrategia: Cache-First (primero caché, si falla, red)
-    // Esto hace que la app funcione offline 
     event.respondWith(
         caches.match(event.request)
             .then(response => {
@@ -49,6 +64,20 @@ self.addEventListener('fetch', event => {
                 // Si no, va a la red
                 return fetch(event.request);
             })
-            // (Agregaremos el manejo de 'offline.html' en el Ejercicio 4)
+    );
+});
+
+// 4. Evento Push (para Notificaciones Push reales)
+self.addEventListener('push', event => {
+    console.log('SW: Notificación Push recibida');
+    const data = event.data ? event.data.json() : {};
+    const title = data.title || 'Nueva Tarea';
+    const options = {
+        body: data.body || '¡Tienes nuevas tareas pendientes!',
+        icon: 'images/icon-192x192.png',
+        badge: 'images/logo.png'
+    };
+    event.waitUntil(
+        self.registration.showNotification(title, options)
     );
 });
