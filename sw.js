@@ -3,20 +3,20 @@
 // ¡¡ATENCIÓN!! Incrementé la versión para forzar la actualización.
 const CACHE_NAME = 'pwa-tareas-cache-v5';
 
-// Lista de archivos a cachear.
-// ¡REVISA QUE TODOS ESTOS EXISTAN EN TU GITHUB PAGES!
-const urlsToCache = [
-    '/',
-    'index.html',
-    'style.css',
-    'main.js',
-    'manifest.json',
-    'firebase-config.js',
-    'firebase-messaging-sw.js',    'images/icon-192x192.png',
-    'images/icon-512x512.png',
-    'images/logo.png'
-];
+const BASE = '/ACTIVIDAD-WEB/';
 
+const urlsToCache = [
+    BASE,
+    BASE + 'index.html',
+    BASE + 'style.css',
+    BASE + 'main.js',
+    BASE + 'manifest.json',
+    BASE + 'firebase-config.js',
+    BASE + 'images/icon-192x192.png',
+    BASE + 'images/icon-512x512.png',
+    BASE + 'images/logo.png'
+
+];
 // 1. Evento de Instalación (install)
 self.addEventListener('install', event => {
     console.log('SW (principal): Instalando...');
