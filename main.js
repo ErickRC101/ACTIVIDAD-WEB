@@ -157,7 +157,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // ¡¡ESTE ES EL ARREGLO!!
             // 1. Registramos manualmente el SW de Firebase
             //    en la ruta correcta (el directorio actual).
-            const swRegistration = await navigator.serviceWorker.register('firebase-messaging-sw.js');
+            const swRegistration = await navigator.serviceWorker.register('ACTIVIDAD-WEB/firebase-messaging-sw.js');
             console.log('SW (Firebase) registrado manualmente:', swRegistration);
 
             // 2. Pasamos ESE registro a getToken.
