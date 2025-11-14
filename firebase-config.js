@@ -18,3 +18,4 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebas
   // Initialize Firebase
   const app = initializeApp(firebaseConfig);
   const analytics = getAnalytics(app);
+  export const db = getFirestore(app);
