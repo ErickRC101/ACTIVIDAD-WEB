@@ -5,17 +5,20 @@ const CACHE_NAME = 'pwa-tareas-cache-v5';
 
 // Lista de archivos a cachear.
 // ¡REVISA QUE TODOS ESTOS EXISTAN EN TU GITHUB PAGES!
+const BASE_PATH = '/ACTIVIDAD-WEB/';
+
 const urlsToCache = [
-    '/',
-    'index.html',
-    'style.css',
-    'main.js',
-    'manifest.json',
-    'firebase-config.js',
-    'images/icon-192x192.png',
-    'images/icon-512x512.png',
-    'images/logo.png'
+  BASE_PATH,
+  BASE_PATH + 'index.html',
+  BASE_PATH + 'style.css',
+  BASE_PATH + 'main.js',
+  BASE_PATH + 'manifest.json',
+  BASE_PATH + 'firebase-config.js',
+  BASE_PATH + 'images/icon-192x192.png',
+  BASE_PATH + 'images/icon-512x512.png',
+  BASE_PATH + 'images/logo.png'
 ];
+
 
 // 1. Evento de Instalación (install)
 self.addEventListener('install', event => {
