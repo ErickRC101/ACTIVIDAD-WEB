@@ -161,7 +161,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // ¡¡ATENCIÓN!! PEGA TU CLAVE VAPID AQUÍ
         // (La que generaste en la consola de Firebase -> Cloud Messaging)
         //
-        const VAPID_KEY = "PEGA_TU_CLAVE_VAPID_AQUÍ";
+        const VAPID_KEY = "BFP4SNKgtthyCcA57vQGpMkBFcLgLWzntgivWXNOgHPFhKJ1osAj_26jUXGf4Tad1UhviqBrQqPxqW1tpB7o7wI	";
 
         getToken(messaging, { vapidKey: VAPID_KEY })
             .then((currentToken) => {

@@ -11,10 +11,10 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebas
     appId: "1:918288225000:web:ee31ac6c481f1bd3ab6f5d",
     measurementId: "G-93Z01RW3HN"
   };
+// Inicializar Firebase
+firebase.initializeApp(firebaseConfig);
 
-  // Initialize Firebase
-  const app = initializeApp(firebaseConfig);
-  // Obtener la instancia de Messaging
+// Obtener la instancia de Messaging
 const messaging = firebase.messaging();
 
 // Manejar notificaciones en segundo plano

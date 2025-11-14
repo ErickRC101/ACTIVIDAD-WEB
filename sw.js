@@ -1,9 +1,10 @@
 // sw.js
 
 // ¡¡ATENCIÓN!! Incrementé la versión para forzar la actualización.
-const CACHE_NAME = 'pwa-tareas-cache-v4';
+const CACHE_NAME = 'pwa-tareas-cache-v5';
 
-// Lista de archivos a cachear
+// Lista de archivos a cachear.
+// ¡REVISA QUE TODOS ESTOS EXISTAN EN TU GITHUB PAGES!
 const urlsToCache = [
     '/',
     'index.html',
@@ -11,10 +12,9 @@ const urlsToCache = [
     'main.js',
     'manifest.json',
     'firebase-config.js',
-    'images/icon-192x192.png',
+    'firebase-messaging-sw.js',    'images/icon-192x192.png',
     'images/icon-512x512.png',
-    'images/logo.png',
-    'firebase-messaging-sw.js' 
+    'images/logo.png'
 ];
 
 // 1. Evento de Instalación (install)
@@ -24,16 +24,19 @@ self.addEventListener('install', event => {
         caches.open(CACHE_NAME)
             .then(cache => {
                 console.log('SW (principal): Abriendo caché y guardando archivos estáticos');
-                return cache.addAll(urlsToCache);
+                // Si esto falla, es porque uno de los archivos en urlsToCache
+                // no se encontró (dio 404)
+                return cache.addAll(urlsToCache); 
             })
             .catch(err => {
                 console.error('SW (principal): Falló cache.addAll', err);
+                // Revisa la pestaña "Network" (Red) en F12
+                // para ver qué archivo dio error 404.
             })
     );
 });
 
 // 2. Evento de Activación (activate)
-// Limpia cachés antiguas
 self.addEventListener('activate', event => {
     console.log('SW (principal): Activando...');
     event.waitUntil(
@@ -52,7 +55,6 @@ self.addEventListener('activate', event => {
 
 // 3. Evento de Interceptación (fetch)
 self.addEventListener('fetch', event => {
-    // Estrategia: Cache-First (primero caché, si falla, red)
     event.respondWith(
         caches.match(event.request)
             .then(response => {
@@ -66,8 +68,4 @@ self.addEventListener('fetch', event => {
     );
 });
 
-//
-// 4. Evento Push
-// (¡ELIMINADO!)
-// El archivo 'firebase-messaging-sw.js' se encarga ahora de esto.
-//
+// (El evento 'push' fue eliminado correctamente de aquí)
