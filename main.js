@@ -22,10 +22,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const listaTareas = document.getElementById('lista-tareas');
     const tareasCollection = collection(db, 'tareas');
 
-    // FUNCIÓN CORREGIDA: Muestra notificaciones compatibles (PC y Móvil)
+    // Función auxiliar: Notificaciones (PC y Móvil)
     function mostrarNotificacionOficial(titulo, cuerpo) {
         if (Notification.permission === 'granted') {
-            // CORRECCIÓN: Usamos .ready (propiedad) en vez de .getReady() (función que no existe)
             navigator.serviceWorker.ready.then(registration => {
                 registration.showNotification(titulo, {
                     body: cuerpo,
@@ -33,19 +32,37 @@ document.addEventListener('DOMContentLoaded', () => {
                     vibrate: [200, 100, 200]
                 });
             }).catch(error => {
-                console.log("No se pudo usar SW, usando fallback nativo:", error);
-                new Notification(titulo, { 
-                    body: cuerpo, 
-                    icon: 'images/icon-192x192.png' 
-                });
+                console.log("Usando fallback notificación:", error);
+                new Notification(titulo, { body: cuerpo, icon: 'images/icon-192x192.png' });
             });
         }
     }
 
-    function renderizarTarea(id, texto) {
+    // --- NUEVO GPS: Función Renderizar modificada para mostrar mapa ---
+    function renderizarTarea(id, data) {
+        // data puede ser el objeto entero (con texto y ubicacion) o solo texto si es antiguo
+        const texto = typeof data === 'object' ? data.texto : data;
+        const ubicacion = typeof data === 'object' ? data.ubicacion : null;
+
         const li = document.createElement('li');
         li.setAttribute('data-id', id);
-        li.innerHTML = `<span>${texto}</span> <button class="delete-btn">Borrar</button>`;
+
+        let htmlContent = `<span>${texto}</span>`;
+        
+        // Si tiene ubicación, agregamos un enlace a Google Maps
+        if (ubicacion) {
+            htmlContent += `
+                <br>
+                <a href="https://www.google.com/maps?q=${ubicacion.lat},${ubicacion.lon}" 
+                   target="_blank" 
+                   style="color: #3498db; font-size: 0.8em; text-decoration: none;">
+                   📍 Ver ubicación
+                </a>`;
+        }
+
+        htmlContent += `<button class="delete-btn">Borrar</button>`;
+        li.innerHTML = htmlContent;
+        
         li.querySelector('.delete-btn').onclick = () => borrarTarea(id, li);
         listaTareas.appendChild(li);
     }
@@ -55,9 +72,42 @@ document.addEventListener('DOMContentLoaded', () => {
         const textoTarea = inputTarea.value.trim();
         if (textoTarea === '') return;
 
+        // --- NUEVO GPS: Capturar coordenadas ---
+        let ubicacionCapturada = null;
+        
+        // Preguntamos si el navegador soporta Geo
+        if ('geolocation' in navigator) {
+            try {
+                // Mostramos un texto temporal en el botón (opcional)
+                const btnSubmit = formTarea.querySelector('button');
+                const textoOriginal = btnSubmit.textContent;
+                btnSubmit.textContent = "📍 Localizando...";
+                
+                // Promesa para obtener posición (esperamos a que el usuario acepte)
+                const position = await new Promise((resolve, reject) => {
+                    navigator.geolocation.getCurrentPosition(resolve, reject, {
+                        enableHighAccuracy: true,
+                        timeout: 5000 // Esperamos máximo 5 seg
+                    });
+                });
+
+                ubicacionCapturada = {
+                    lat: position.coords.latitude,
+                    lon: position.coords.longitude
+                };
+                
+                btnSubmit.textContent = textoOriginal; // Restaurar botón
+            } catch (err) {
+                console.warn("No se pudo obtener GPS (Usuario denegó o error):", err);
+                const btnSubmit = formTarea.querySelector('button');
+                btnSubmit.textContent = "Agregar"; // Restaurar botón si falla
+            }
+        }
+
         const nuevaTarea = {
             texto: textoTarea,
-            timestamp: Timestamp.fromDate(new Date())
+            timestamp: Timestamp.fromDate(new Date()),
+            ubicacion: ubicacionCapturada // Guardamos lat/lon o null
         };
 
         try {
@@ -65,15 +115,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const docRef = await addDoc(tareasCollection, nuevaTarea);
             
             // Guardar Local y Renderizar
-            guardarLocal(docRef.id, nuevaTarea.texto);
-            renderizarTarea(docRef.id, nuevaTarea.texto);
+            guardarLocal(docRef.id, nuevaTarea);
+            renderizarTarea(docRef.id, nuevaTarea);
             
-            // Notificación de éxito
-            mostrarNotificacionOficial('¡Tarea Agregada!', `Guardada: "${nuevaTarea.texto}"`);
+            mostrarNotificacionOficial('¡Tarea Agregada!', `Guardada con éxito`);
 
         } catch (error) {
-            console.error("Error al guardar (posiblemente offline):", error);
-            // Si falla la red, podríamos guardar solo en local aquí si quisiéramos lógica extra
+            console.error("Error al guardar:", error);
         }
         inputTarea.value = ''; 
     }
@@ -89,10 +137,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- 3. Almacenamiento Local (LocalStorage) ---
-    function guardarLocal(id, texto) {
+    // --- Almacenamiento Local ---
+    // Modificado para guardar el objeto completo (texto + ubicacion)
+    function guardarLocal(id, data) {
         const tareas = JSON.parse(localStorage.getItem('tareas') || '{}');
-        tareas[id] = texto;
+        tareas[id] = data;
         localStorage.setItem('tareas', JSON.stringify(tareas));
     }
 
@@ -110,8 +159,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 const querySnapshot = await getDocs(q);
                 localStorage.removeItem('tareas'); 
                 querySnapshot.forEach(doc => {
-                    renderizarTarea(doc.id, doc.data().texto);
-                    guardarLocal(doc.id, doc.data().texto);
+                    const data = doc.data();
+                    renderizarTarea(doc.id, data);
+                    guardarLocal(doc.id, data);
                 });
             } catch (e) { 
                 console.log("Fallo conexión, cargando caché.");
@@ -124,13 +174,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function cargarDeCacheLocal() {
         const tareas = JSON.parse(localStorage.getItem('tareas') || '{}');
-        for (const id in tareas) renderizarTarea(id, tareas[id]);
+        for (const id in tareas) {
+            renderizarTarea(id, tareas[id]);
+        }
     }
 
     formTarea.addEventListener('submit', agregarTarea);
     cargarTareas();
 
-    // --- 4. Monitor de Red ---
+    // --- Monitor de Red ---
     const divEstadoRed = document.getElementById('estado-red');
     function actualizarEstadoRed() {
         if (navigator.onLine) {
@@ -148,7 +200,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('offline', actualizarEstadoRed);
     actualizarEstadoRed();
 
-    // --- 5. Notificaciones Push ---
+    // --- Notificaciones Push ---
     onMessage(messaging, (payload) => {
         console.log('Mensaje foreground:', payload);
         const { title, body } = payload.notification;
@@ -156,43 +208,32 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     const btnNotificaciones = document.getElementById('btn-notificaciones');
-
     btnNotificaciones.addEventListener('click', () => {
-        console.log("Pidiendo permiso...");
         Notification.requestPermission().then(permission => {
             if (permission === 'granted') {
                 pedirToken();
             } else {
-                alert("Habilita las notificaciones en el navegador.");
+                alert("Habilita las notificaciones.");
             }
         });
     });
 
     async function pedirToken() {
-        const VAPID_KEY = "BFP4SNKgtthyCcA57vQGpMkBFcLgLWzntgivWXNOgHPFhKJ1osAj_26jUXGf4Tad1UhviqBrQqPxqW1tpB7o7wI"; // Tu VAPID KEY
-
+        const VAPID_KEY = "BFP4SNKgtthyCcA57vQGpMkBFcLgLWzntgivWXNOgHPFhKJ1osAj_26jUXGf4Tad1UhviqBrQqPxqW1tpB7o7wI";
         try {
-            // Registro del SW de mensajería con espera para evitar errores
             const swRegistration = await navigator.serviceWorker.register('./firebase-messaging-sw.js');
-            
-            await navigator.serviceWorker.ready; // Esperamos a que esté activo
-
+            await navigator.serviceWorker.ready;
             const currentToken = await getToken(messaging, { 
                 vapidKey: VAPID_KEY,
                 serviceWorkerRegistration: swRegistration 
             });
-
             if (currentToken) {
                 console.log('TOKEN:', currentToken);
                 btnNotificaciones.textContent = "¡Activadas!";
                 btnNotificaciones.disabled = true;
-                mostrarNotificacionOficial("¡Listo!", "Notificaciones activadas correctamente.");
-            } else {
-                console.log('No se obtuvo token.');
             }
         } catch (err) {
             console.error('Error notificaciones:', err);
-            alert("Error: " + err.message);
         }
     }
 });
