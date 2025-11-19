@@ -13,10 +13,10 @@ import { getToken } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-mes
 document.addEventListener('DOMContentLoaded', () => {
 
     // --- Lógica de Registro del Service Worker PRINCIPAL (Para caché offline) ---
-    // Solo registramos sw.js aquí. El de Firebase se carga al pedir permiso.
+    // Registramos sw.js usando la ruta absoluta para evitar errores en GitHub Pages
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-            navigator.serviceWorker.register('/ACTIVIDAD-WEB/sw.js') // Ruta absoluta
+            navigator.serviceWorker.register('/ACTIVIDAD-WEB/sw.js') 
                 .then(registration => {
                     console.log('SW (principal) registrado correctamente:', registration);
                 })
@@ -36,23 +36,57 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderizarTarea(id, texto) {
         const li = document.createElement('li');
         li.setAttribute('data-id', id);
-        li.innerHTML = `<span>${texto}</span><button class="delete-btn">Borrar</button>`;
-        li.querySelector('.delete-btn').onclick = () => borrarTarea(id, li);
+        li.innerHTML = `
+            <span>${texto}</span>
+            <button class="delete-btn">Borrar</button>
+        `;
+        
+        // Asignar evento al botón de borrar
+        li.querySelector('.delete-btn').onclick = () => {
+            borrarTarea(id, li);
+        };
+
         listaTareas.appendChild(li);
     }
 
-    // Función para agregar tarea
+    // Función para agregar tarea (¡MODIFICADA CON NOTIFICACIÓN LOCAL!)
     async function agregarTarea(e) {
-        e.preventDefault();
+        e.preventDefault(); // Evita que el formulario recargue la página
         const textoTarea = inputTarea.value.trim();
         if (textoTarea === '') return;
-        const nuevaTarea = { texto: textoTarea, timestamp: Timestamp.fromDate(new Date()) };
+
+        const nuevaTarea = {
+            texto: textoTarea,
+            timestamp: Timestamp.fromDate(new Date())
+        };
+
         try {
+            // 1. Guardar en Firestore
             const docRef = await addDoc(tareasCollection, nuevaTarea);
+            
+            // 2. Guardar en localStorage
             guardarLocal(docRef.id, nuevaTarea.texto);
+            
+            // 3. Renderizar en la UI
             renderizarTarea(docRef.id, nuevaTarea.texto);
-        } catch (error) { console.error("Error Firestore:", error); }
-        inputTarea.value = ''; 
+            
+            // ----------------------------------------------------
+            // ¡NUEVO! - Notificación Local al crear tarea
+            // ----------------------------------------------------
+            if (Notification.permission === 'granted') {
+                new Notification('¡Tarea Agregada!', {
+                    body: `Has creado la tarea: "${nuevaTarea.texto}"`,
+                    icon: 'images/icon-192x192.png',
+                    vibrate: [200, 100, 200]
+                });
+            }
+            // ----------------------------------------------------
+
+        } catch (error) {
+            console.error("Error al guardar en Firestore: ", error);
+        }
+        
+        inputTarea.value = ''; // Limpiar el input
     }
 
     // Función para borrar tarea
@@ -61,51 +95,66 @@ document.addEventListener('DOMContentLoaded', () => {
             await deleteDoc(doc(db, 'tareas', id));
             borrarLocal(id);
             listaTareas.removeChild(elementoLi);
-        } catch (error) { console.error("Error Firestore:", error); }
+        } catch (error) {
+            console.error("Error al eliminar de Firestore: ", error);
+        }
     }
 
-    // --- Almacenamiento Local ---
+    // --- Almacenamiento Local (localStorage) ---
     function guardarLocal(id, texto) {
         const tareas = obtenerTareasLocal();
         tareas[id] = texto;
         localStorage.setItem('tareas', JSON.stringify(tareas));
     }
+
     function borrarLocal(id) {
         const tareas = obtenerTareasLocal();
         delete tareas[id];
         localStorage.setItem('tareas', JSON.stringify(tareas));
     }
+
     function obtenerTareasLocal() {
         const tareas = localStorage.getItem('tareas');
         return tareas ? JSON.parse(tareas) : {};
     }
 
-    // Cargar tareas
+    // Cargar tareas al iniciar
     async function cargarTareas() {
         try {
             const q = query(tareasCollection, orderBy("timestamp", "desc"));
             const querySnapshot = await getDocs(q);
+
             if (querySnapshot.empty) {
+                console.log("No hay tareas en Firestore, cargando de localStorage...");
                 const tareasLocales = obtenerTareasLocal();
-                for (const id in tareasLocales) renderizarTarea(id, tareasLocales[id]);
+                for (const id in tareasLocales) {
+                    renderizarTarea(id, tareasLocales[id]);
+                }
             } else {
-                localStorage.removeItem('tareas'); 
+                console.log("Cargando tareas desde Firestore...");
+                localStorage.removeItem('tareas'); // Limpiamos local
                 querySnapshot.forEach(doc => {
-                    renderizarTarea(doc.id, doc.data().texto);
-                    guardarLocal(doc.id, doc.data().texto);
+                    const tarea = doc.data();
+                    renderizarTarea(doc.id, tarea.texto);
+                    guardarLocal(doc.id, tarea.texto);
                 });
             }
         } catch (error) {
-            console.warn("Offline, cargando local:", error.message);
+            console.warn("Error de Firestore. Cargando de localStorage.", error.message);
             const tareasLocales = obtenerTareasLocal();
-            for (const id in tareasLocales) renderizarTarea(id, tareasLocales[id]);
+            for (const id in tareasLocales) {
+                renderizarTarea(id, tareasLocales[id]);
+            }
         }
     }
 
+    // Asignar el evento al ENVIAR el formulario
     formTarea.addEventListener('submit', agregarTarea);
+    
+    // Cargar tareas al iniciar la app
     cargarTareas();
 
-    // --- Estado de red ---
+    // --- Extensión Ejercicio 1: Detectar estado de red ---
     const divEstadoRed = document.getElementById('estado-red');
     function actualizarEstadoRed() {
         divEstadoRed.className = navigator.onLine ? 'online' : 'offline';
@@ -115,43 +164,45 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('offline', actualizarEstadoRed);
     actualizarEstadoRed();
 
-    // --- NOTIFICACIONES PUSH (CORREGIDO) ---
+    // --- Etapa 5 / Ejercicio 2: Notificaciones Push (Modificado para FCM) ---
     const btnNotificaciones = document.getElementById('btn-notificaciones');
 
     btnNotificaciones.addEventListener('click', () => {
-        console.log("Solicitando permiso...");
+        console.log("Solicitando permiso para Notificaciones Push...");
         pedirToken();
     });
 
     async function pedirToken() {
+        
         const VAPID_KEY = "BFP4SNKgtthyCcA57vQGpMkBFcLgLWzntgivWXNOgHPFhKJ1osAj_26jUXGf4Tad1UhviqBrQqPxqW1tpB7o7wI";
 
         try {
-            // 1. Registramos el SW de Firebase usando la RUTA ABSOLUTA
-            // Esto evita el error de "ACTIVIDAD-WEB/ACTIVIDAD-WEB/"
+            // 1. Registramos manualmente el SW de Firebase en la ruta CORRECTA
+            // y con un scope específico para evitar conflictos
             const swRegistration = await navigator.serviceWorker.register('/ACTIVIDAD-WEB/firebase-messaging-sw.js', {
-                // Usamos un scope diferente para que no sobrescriba a tu sw.js principal
                 scope: '/ACTIVIDAD-WEB/firebase-cloud-messaging-push-scope'
             });
             
             console.log('SW (Firebase) registrado manualmente:', swRegistration);
 
-            // 2. Pasamos ese registro a getToken
+            // 2. Pasamos ESE registro a getToken
             const currentToken = await getToken(messaging, { 
                 vapidKey: VAPID_KEY,
-                serviceWorkerRegistration: swRegistration
+                serviceWorkerRegistration: swRegistration 
             });
 
             if (currentToken) {
-                console.log('Token FCM:', currentToken);
+                console.log('Token de dispositivo (FCM):', currentToken);
+                
                 btnNotificaciones.textContent = "¡Notificaciones Activadas!";
                 btnNotificaciones.disabled = true;
-                // ¡Prueba enviar un mensaje desde Firebase Console a este token!
+
             } else {
-                console.log('No se obtuvo permiso.');
+                console.log('No se obtuvo permiso para notificaciones.');
             }
         } catch (err) {
-            console.log('Error al obtener token:', err);
+            console.log('Ocurrió un error al obtener el token.', err);
         }
     }
+
 });
