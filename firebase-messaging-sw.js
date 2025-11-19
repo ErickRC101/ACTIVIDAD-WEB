@@ -1,8 +1,13 @@
-// Importar los scripts clásicos de Firebase para SW
+// -------------------------------------------------------------------------
+// firebase-messaging-sw.js
+// Service Worker exclusivo para recibir notificaciones Push en segundo plano
+// -------------------------------------------------------------------------
+
+// Importamos los scripts de Firebase Compat (Más estables para SW)
 importScripts("https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js");
 importScripts("https://www.gstatic.com/firebasejs/8.10.0/firebase-messaging.js");
 
-// Tu configuración de Firebase
+// Inicializa Firebase (Asegúrate de que estos datos sean de TU proyecto)
 firebase.initializeApp({
   apiKey: "AIzaSyCEefPRDaJKCqVjH-EnBOexaWjZzGKPsUk",
   authDomain: "lista-de-tareas-3365f.firebaseapp.com",
@@ -13,18 +18,23 @@ firebase.initializeApp({
   measurementId: "G-93Z01RW3HN"
 });
 
-// Inicializar Messaging
+// Obtenemos la instancia de mensajería
 const messaging = firebase.messaging();
 
-// Manejar mensajes cuando la app está cerrada o en segundo plano
+// Manejador para cuando la App está CERRADA (Background)
 messaging.onBackgroundMessage((payload) => {
-  console.log("[firebase-messaging-sw.js] Received background message:", payload);
+  console.log("[firebase-messaging-sw.js] Notificación recibida en background:", payload);
 
+  // Extraemos datos
   const notificationTitle = payload.notification.title;
   const notificationOptions = {
     body: payload.notification.body,
-    icon: "./images/icon-192x192.png"
+    icon: './images/icon-192x192.png', // Ruta relativa importante para GitHub Pages
+    badge: './images/icon-192x192.png', // Icono pequeño para la barra de estado (Android)
+    vibrate: [200, 100, 200],
+    tag: 'notificacion-push' // Evita acumulación excesiva de notificaciones
   };
 
-  self.registration.showNotification(notificationTitle, notificationOptions);
+  // Mostramos la notificación usando la API nativa del Service Worker
+  return self.registration.showNotification(notificationTitle, notificationOptions);
 });
