@@ -1,4 +1,3 @@
-// Importar configuración y SDKs
 import { db, messaging } from './firebase-config.js'; 
 import { 
     collection, addDoc, getDocs, deleteDoc, doc, 
@@ -8,40 +7,33 @@ import { getToken, onMessage } from "https://www.gstatic.com/firebasejs/12.5.0/f
 
 document.addEventListener('DOMContentLoaded', () => {
 
-    // ==============================================================
-    // 1. REGISTRO DEL SERVICE WORKER PRINCIPAL (Caché / Offline)
-    // ==============================================================
-    // Este SW (sw.js) se encarga de que la app funcione sin internet
+    // --- 1. Registro del SW de Caché (Offline) ---
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
             navigator.serviceWorker.register('./sw.js')
-                .then(registration => {
-                    console.log('SW (Caché) registrado:', registration.scope);
-                })
-                .catch(err => console.log('Fallo al registrar SW Caché:', err));
+                .then(reg => console.log('SW Caché registrado:', reg.scope))
+                .catch(err => console.log('Error SW Caché:', err));
         });
     }
 
-    // ==============================================================
-    // 2. LÓGICA DE LA APLICACIÓN (Tareas)
-    // ==============================================================
+    // --- 2. Lógica de Tareas ---
     const formTarea = document.getElementById('form-tarea');
     const inputTarea = document.getElementById('input-tarea');
     const listaTareas = document.getElementById('lista-tareas');
     const tareasCollection = collection(db, 'tareas');
 
-    // Función auxiliar: Muestra notificación compatible con PC y Android
+    // FUNCIÓN CORREGIDA: Muestra notificaciones compatibles (PC y Móvil)
     function mostrarNotificacionOficial(titulo, cuerpo) {
         if (Notification.permission === 'granted') {
-            // Intentamos usar el SW activo para mostrar la notificación (requerido en Android)
-            navigator.serviceWorker.getReady.then(registration => {
+            // CORRECCIÓN: Usamos .ready (propiedad) en vez de .getReady() (función que no existe)
+            navigator.serviceWorker.ready.then(registration => {
                 registration.showNotification(titulo, {
                     body: cuerpo,
                     icon: 'images/icon-192x192.png',
                     vibrate: [200, 100, 200]
                 });
-            }).catch(() => {
-                // Fallback simple si algo falla
+            }).catch(error => {
+                console.log("No se pudo usar SW, usando fallback nativo:", error);
                 new Notification(titulo, { 
                     body: cuerpo, 
                     icon: 'images/icon-192x192.png' 
@@ -69,19 +61,19 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         try {
-            // 1. Guardar en Firestore
+            // Guardar en Firestore
             const docRef = await addDoc(tareasCollection, nuevaTarea);
             
-            // 2. Guardar Local y Renderizar
+            // Guardar Local y Renderizar
             guardarLocal(docRef.id, nuevaTarea.texto);
             renderizarTarea(docRef.id, nuevaTarea.texto);
             
-            // 3. Notificación Local (Feedback inmediato)
+            // Notificación de éxito
             mostrarNotificacionOficial('¡Tarea Agregada!', `Guardada: "${nuevaTarea.texto}"`);
 
         } catch (error) {
-            console.error("Error guardando (posiblemente offline): ", error);
-            // Aquí podrías añadir lógica para guardar pendiente de sincronización
+            console.error("Error al guardar (posiblemente offline):", error);
+            // Si falla la red, podríamos guardar solo en local aquí si quisiéramos lógica extra
         }
         inputTarea.value = ''; 
     }
@@ -93,13 +85,11 @@ document.addEventListener('DOMContentLoaded', () => {
             listaTareas.removeChild(elementoLi);
         } catch (error) {
             console.error("Error al borrar:", error);
-            alert("Error al borrar. Verifica tu conexión.");
+            alert("Error al borrar. Revisa tu conexión.");
         }
     }
 
-    // ==============================================================
-    // 3. GESTIÓN DE DATOS (Offline/Online)
-    // ==============================================================
+    // --- 3. Almacenamiento Local (LocalStorage) ---
     function guardarLocal(id, texto) {
         const tareas = JSON.parse(localStorage.getItem('tareas') || '{}');
         tareas[id] = texto;
@@ -123,7 +113,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     renderizarTarea(doc.id, doc.data().texto);
                     guardarLocal(doc.id, doc.data().texto);
                 });
-            } catch (e) { cargarDeCacheLocal(); }
+            } catch (e) { 
+                console.log("Fallo conexión, cargando caché.");
+                cargarDeCacheLocal(); 
+            }
         } else {
             cargarDeCacheLocal();
         }
@@ -137,7 +130,7 @@ document.addEventListener('DOMContentLoaded', () => {
     formTarea.addEventListener('submit', agregarTarea);
     cargarTareas();
 
-    // Monitor de Red
+    // --- 4. Monitor de Red ---
     const divEstadoRed = document.getElementById('estado-red');
     function actualizarEstadoRed() {
         if (navigator.onLine) {
@@ -155,13 +148,9 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('offline', actualizarEstadoRed);
     actualizarEstadoRed();
 
-    // ==============================================================
-    // 4. NOTIFICACIONES PUSH (FIREBASE CLOUD MESSAGING)
-    // ==============================================================
-    
-    // Listener para mensajes en PRIMER PLANO (App abierta)
+    // --- 5. Notificaciones Push ---
     onMessage(messaging, (payload) => {
-        console.log('Mensaje recibido en primer plano:', payload);
+        console.log('Mensaje foreground:', payload);
         const { title, body } = payload.notification;
         mostrarNotificacionOficial(title, body);
     });
@@ -169,28 +158,24 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnNotificaciones = document.getElementById('btn-notificaciones');
 
     btnNotificaciones.addEventListener('click', () => {
-        console.log("Solicitando permiso al usuario...");
+        console.log("Pidiendo permiso...");
         Notification.requestPermission().then(permission => {
             if (permission === 'granted') {
-                console.log("Permiso concedido. Obteniendo token...");
                 pedirToken();
             } else {
-                alert("Permiso denegado. Habilita las notificaciones en el navegador.");
+                alert("Habilita las notificaciones en el navegador.");
             }
         });
     });
 
     async function pedirToken() {
-        const VAPID_KEY = "BFP4SNKgtthyCcA57vQGpMkBFcLgLWzntgivWXNOgHPFhKJ1osAj_26jUXGf4Tad1UhviqBrQqPxqW1tpB7o7wI";
+        const VAPID_KEY = "BFP4SNKgtthyCcA57vQGpMkBFcLgLWzntgivWXNOgHPFhKJ1osAj_26jUXGf4Tad1UhviqBrQqPxqW1tpB7o7wI"; // Tu VAPID KEY
 
         try {
-            // PASO CLAVE: Registrar SW manualmente antes de pedir token para evitar AbortError
+            // Registro del SW de mensajería con espera para evitar errores
             const swRegistration = await navigator.serviceWorker.register('./firebase-messaging-sw.js');
             
-            // Esperamos a que el SW esté activo
-            await navigator.serviceWorker.ready;
-
-            console.log('SW de Mensajería listo. Solicitando token a Firebase...');
+            await navigator.serviceWorker.ready; // Esperamos a que esté activo
 
             const currentToken = await getToken(messaging, { 
                 vapidKey: VAPID_KEY,
@@ -198,16 +183,16 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             if (currentToken) {
-                console.log('Token generado con éxito:', currentToken);
-                btnNotificaciones.textContent = "¡Notificaciones Activadas!";
+                console.log('TOKEN:', currentToken);
+                btnNotificaciones.textContent = "¡Activadas!";
                 btnNotificaciones.disabled = true;
-                mostrarNotificacionOficial("Configuración Exitosa", "Ahora puedes recibir notificaciones Push.");
+                mostrarNotificacionOficial("¡Listo!", "Notificaciones activadas correctamente.");
             } else {
-                console.log('No se obtuvo el token.');
+                console.log('No se obtuvo token.');
             }
         } catch (err) {
-            console.error('Error al configurar notificaciones:', err);
-            alert("Hubo un error: " + err.message + ". Revisa la consola (F12).");
+            console.error('Error notificaciones:', err);
+            alert("Error: " + err.message);
         }
     }
 });

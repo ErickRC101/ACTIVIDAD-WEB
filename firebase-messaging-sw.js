@@ -1,13 +1,8 @@
-// -------------------------------------------------------------------------
-// firebase-messaging-sw.js
-// Service Worker exclusivo para recibir notificaciones Push en segundo plano
-// -------------------------------------------------------------------------
-
-// Importamos los scripts de Firebase Compat (Más estables para SW)
+// Importar scripts de Firebase Compat (Estable para Service Workers)
 importScripts("https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js");
 importScripts("https://www.gstatic.com/firebasejs/8.10.0/firebase-messaging.js");
 
-// Inicializa Firebase (Asegúrate de que estos datos sean de TU proyecto)
+// Configuración de Firebase (Debe coincidir con la tuya)
 firebase.initializeApp({
   apiKey: "AIzaSyCEefPRDaJKCqVjH-EnBOexaWjZzGKPsUk",
   authDomain: "lista-de-tareas-3365f.firebaseapp.com",
@@ -18,23 +13,20 @@ firebase.initializeApp({
   measurementId: "G-93Z01RW3HN"
 });
 
-// Obtenemos la instancia de mensajería
 const messaging = firebase.messaging();
 
-// Manejador para cuando la App está CERRADA (Background)
+// Manejador de mensajes en SEGUNDO PLANO (App cerrada/minimizada)
 messaging.onBackgroundMessage((payload) => {
-  console.log("[firebase-messaging-sw.js] Notificación recibida en background:", payload);
+  console.log("[firebase-messaging-sw.js] Notificación Push recibida:", payload);
 
-  // Extraemos datos
   const notificationTitle = payload.notification.title;
   const notificationOptions = {
     body: payload.notification.body,
-    icon: './images/icon-192x192.png', // Ruta relativa importante para GitHub Pages
-    badge: './images/icon-192x192.png', // Icono pequeño para la barra de estado (Android)
+    icon: './images/icon-192x192.png', // Ruta relativa corregida
+    badge: './images/icon-192x192.png',
     vibrate: [200, 100, 200],
-    tag: 'notificacion-push' // Evita acumulación excesiva de notificaciones
+    tag: 'push-notification'
   };
 
-  // Mostramos la notificación usando la API nativa del Service Worker
   return self.registration.showNotification(notificationTitle, notificationOptions);
 });
