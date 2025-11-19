@@ -1,10 +1,8 @@
 // sw.js
+// He subido la versión para forzar a que el navegador actualice este archivo
+const CACHE_NAME = 'pwa-tareas-cache-v6';
 
-// ¡¡ATENCIÓN!! Incrementé la versión para forzar la actualización.
-const CACHE_NAME = 'pwa-tareas-cache-v5';
-
-// Lista de archivos a cachear.
-// ¡REVISA QUE TODOS ESTOS EXISTAN EN TU GITHUB PAGES!
+// Rutas base (ajustadas a tu repositorio)
 const BASE_PATH = '/ACTIVIDAD-WEB/';
 
 const urlsToCache = [
@@ -19,27 +17,21 @@ const urlsToCache = [
   BASE_PATH + 'images/logo.png'
 ];
 
-
-// 1. Evento de Instalación (install)
+// 1. INSTALACIÓN
 self.addEventListener('install', event => {
     console.log('SW (principal): Instalando...');
+    self.skipWaiting(); // Fuerza al SW a activarse de inmediato
     event.waitUntil(
         caches.open(CACHE_NAME)
             .then(cache => {
-                console.log('SW (principal): Abriendo caché y guardando archivos estáticos');
-                // Si esto falla, es porque uno de los archivos en urlsToCache
-                // no se encontró (dio 404)
-                return cache.addAll(urlsToCache); 
+                console.log('SW (principal): Cacheando archivos...');
+                return cache.addAll(urlsToCache);
             })
-            .catch(err => {
-                console.error('SW (principal): Falló cache.addAll', err);
-                // Revisa la pestaña "Network" (Red) en F12
-                // para ver qué archivo dio error 404.
-            })
+            .catch(err => console.error('Error cacheando:', err))
     );
 });
 
-// 2. Evento de Activación (activate)
+// 2. ACTIVACIÓN
 self.addEventListener('activate', event => {
     console.log('SW (principal): Activando...');
     event.waitUntil(
@@ -47,28 +39,39 @@ self.addEventListener('activate', event => {
             return Promise.all(
                 cacheNames.map(cacheName => {
                     if (cacheName !== CACHE_NAME) {
-                        console.log('SW (principal): Limpiando caché antigua:', cacheName);
+                        console.log('SW (principal): Borrando caché vieja:', cacheName);
                         return caches.delete(cacheName);
                     }
                 })
             );
-        })
+        }).then(() => self.clients.claim()) // Toma control de la página inmediatamente
     );
 });
 
-// 3. Evento de Interceptación (fetch)
+// 3. INTERCEPTACIÓN (FETCH) - ¡AQUÍ ESTABA EL ERROR!
 self.addEventListener('fetch', event => {
+    
+    // EXCEPCIÓN IMPORTANTE:
+    // Si la petición es para Firebase, Google APIs o scripts externos, 
+    // NO intentes buscarla en caché local. Déjala pasar a la red.
+    if (event.request.url.includes('firebase') || 
+        event.request.url.includes('googleapis') || 
+        event.request.url.includes('gstatic')) {
+        return; // "return" vacío significa: "Service Worker, no te metas, ve a la red"
+    }
+
     event.respondWith(
         caches.match(event.request)
             .then(response => {
-                // Si está en caché, lo devuelve
+                // Si está en caché, devuélvelo
                 if (response) {
                     return response;
                 }
-                // Si no, va a la red
-                return fetch(event.request);
+                // Si no, búscalo en la red
+                return fetch(event.request).catch(err => {
+                   // Si falla la red (offline) y no está en caché, no hacemos nada (o mostramos offline.html)
+                   console.log("Error solicitando recurso:", event.request.url);
+                });
             })
     );
 });
-
-// (El evento 'push' fue eliminado correctamente de aquí)
