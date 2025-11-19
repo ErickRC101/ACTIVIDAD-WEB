@@ -1,13 +1,14 @@
-// sw.js
-// He subido la versión para forzar a que el navegador actualice este archivo
-const CACHE_NAME = 'pwa-tareas-cache-v6';
+// sw.js (Versión Final - Completa)
+// Incrementamos versión para forzar actualización
+const CACHE_NAME = 'pwa-tareas-cache-v7-final';
 
-// Rutas base (ajustadas a tu repositorio)
+// Ruta base (Ajustada para GitHub Pages)
 const BASE_PATH = '/ACTIVIDAD-WEB/';
 
 const urlsToCache = [
   BASE_PATH,
   BASE_PATH + 'index.html',
+  BASE_PATH + 'offline.html', // <--- NUEVO: Agregamos la página de error
   BASE_PATH + 'style.css',
   BASE_PATH + 'main.js',
   BASE_PATH + 'manifest.json',
@@ -19,58 +20,62 @@ const urlsToCache = [
 
 // 1. INSTALACIÓN
 self.addEventListener('install', event => {
-    console.log('SW (principal): Instalando...');
-    self.skipWaiting(); // Fuerza al SW a activarse de inmediato
+    console.log('SW: Instalando y cacheando offline.html...');
+    self.skipWaiting();
     event.waitUntil(
         caches.open(CACHE_NAME)
             .then(cache => {
-                console.log('SW (principal): Cacheando archivos...');
                 return cache.addAll(urlsToCache);
             })
-            .catch(err => console.error('Error cacheando:', err))
+            .catch(err => console.error('Fallo en caché inicial:', err))
     );
 });
 
-// 2. ACTIVACIÓN
+// 2. ACTIVACIÓN (Limpieza de caché vieja)
 self.addEventListener('activate', event => {
-    console.log('SW (principal): Activando...');
+    console.log('SW: Activando...');
     event.waitUntil(
         caches.keys().then(cacheNames => {
             return Promise.all(
                 cacheNames.map(cacheName => {
                     if (cacheName !== CACHE_NAME) {
-                        console.log('SW (principal): Borrando caché vieja:', cacheName);
                         return caches.delete(cacheName);
                     }
                 })
             );
-        }).then(() => self.clients.claim()) // Toma control de la página inmediatamente
+        }).then(() => self.clients.claim())
     );
 });
 
-// 3. INTERCEPTACIÓN (FETCH) - ¡AQUÍ ESTABA EL ERROR!
+// 3. INTERCEPTACIÓN (Estrategia Offline)
 self.addEventListener('fetch', event => {
     
-    // EXCEPCIÓN IMPORTANTE:
-    // Si la petición es para Firebase, Google APIs o scripts externos, 
-    // NO intentes buscarla en caché local. Déjala pasar a la red.
+    // A. Ignorar peticiones a Google/Firebase (Para evitar errores de CORS/QUIC)
     if (event.request.url.includes('firebase') || 
         event.request.url.includes('googleapis') || 
         event.request.url.includes('gstatic')) {
-        return; // "return" vacío significa: "Service Worker, no te metas, ve a la red"
+        return; 
     }
 
+    // B. Estrategia: Cache First, falling back to Network, falling back to Offline Page
     event.respondWith(
         caches.match(event.request)
             .then(response => {
-                // Si está en caché, devuélvelo
+                // 1. Si está en caché, devolverlo
                 if (response) {
                     return response;
                 }
-                // Si no, búscalo en la red
-                return fetch(event.request).catch(err => {
-                   // Si falla la red (offline) y no está en caché, no hacemos nada (o mostramos offline.html)
-                   console.log("Error solicitando recurso:", event.request.url);
+
+                // 2. Si no, intentar red
+                return fetch(event.request).catch(error => {
+                    // 3. Si falla la red (Offline)...
+                    console.log("Petición fallida:", event.request.url);
+
+                    // Verificar si lo que pedía era una PÁGINA (HTML)
+                    if (event.request.mode === 'navigate') {
+                        // Devolver la página offline personalizada
+                        return caches.match(BASE_PATH + 'offline.html');
+                    }
                 });
             })
     );
